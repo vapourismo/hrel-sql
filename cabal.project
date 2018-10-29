@@ -1,0 +1,5 @@
+packages: hrel-sql.cabal
+optimization: False
+documentation: False
+jobs: $ncpus
+verbose: 2
