@@ -1,7 +1,15 @@
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Language.SQL.Syntax where
+module Language.SQL.Syntax
+    ( BinaryOp (..)
+    , Expression (..)
+    , expDoc
+    , Source (..)
+    , Statement (..)
+    , statementDoc
+    )
+where
 
 import           Data.Foldable      (toList)
 import           Data.List          (intersperse)
