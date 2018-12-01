@@ -4,6 +4,7 @@
 
 module Language.SQL.Columns
     ( Signature
+    , SignatureType
     , (:::)
     , Columns
     , ColumnType
@@ -18,6 +19,9 @@ import Data.Kind (Type)
 -- Columns
 
 data Signature = Signature Symbol Type
+
+type family SignatureType (sig :: Signature) :: Type where
+    SignatureType (_ ::: typ) = typ
 
 type (:::) = 'Signature
 
