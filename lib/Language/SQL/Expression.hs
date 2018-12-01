@@ -15,6 +15,9 @@ module Language.SQL.Expression
     , Expression (..)
 
     , (==)
+    , not
+    , (&&)
+    , (||)
 
     , Label (..)
     , (<.>)
@@ -47,11 +50,11 @@ data SqlString
 -- Binary operators
 
 data BinaryOp a r where
-    And :: BinaryOp Bool Bool
+    And :: BinaryOp SqlBool SqlBool
 
-    Or :: BinaryOp Bool Bool
+    Or :: BinaryOp SqlBool SqlBool
 
-    Equals :: BinaryOp a Bool
+    Equals :: BinaryOp a SqlBool
 
     Plus :: BinaryOp a a
 
@@ -68,6 +71,8 @@ data Callable xs r where
     Absolute :: Callable '[a] a
 
     Sign :: Callable '[a] a
+
+    Not :: Callable '[SqlBool] SqlBool
 
 ----------------------------------------------------------------------------------------------------
 -- Expression data type
@@ -125,8 +130,23 @@ instance Fractional (Expression SqlReal) where
 
     fromRational ratio = fromInteger (numerator ratio) / fromInteger (denominator ratio)
 
-(==) :: Expression a -> Expression a -> Expression Bool
+(==) :: Expression a -> Expression a -> Expression SqlBool
 (==) = Infix Equals
+
+infix 4 ==
+
+not :: Expression SqlBool -> Expression SqlBool
+not x = Apply Not (x :& RNil)
+
+(&&) :: Expression SqlBool -> Expression SqlBool -> Expression SqlBool
+(&&) = Infix And
+
+infixr 3 &&
+
+(||) :: Expression SqlBool -> Expression SqlBool -> Expression SqlBool
+(||) = Infix Or
+
+infixr 2 ||
 
 ----------------------------------------------------------------------------------------------------
 -- Field access
@@ -139,3 +159,5 @@ instance (KnownSymbol b, a ~ b) => IsLabel a (Label b) where
 
 (<.>) :: ColumnType a n ~ b => Expression a -> Label n -> Expression b
 (<.>) = Access
+
+infixl 8 <.>
