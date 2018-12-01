@@ -99,21 +99,19 @@ selectorDoc selector =
                 , Pretty.text (symbolVal label)
                 ]
 
+sourceDoc :: Statement a -> Builder Pretty.Doc
+sourceDoc source = do
+    name <- allocName
+    doc  <- statementDoc source
+    pure (Pretty.sep [doc, "AS", Pretty.text (Text.unpack name)])
+
 statementDoc :: Statement a -> Builder Pretty.Doc
 statementDoc = \case
     TableOnly name -> pure ("TABLE ONLY " <> Pretty.text (Text.unpack name))
 
     Select expand restrict sources -> do
-        binder <- rtraverse (const (Variable <$> allocName)) sources
-
-        fromClause <-
-            sequenceA
-                (flatten
-                    (\source -> do
-                        name <- allocName
-                        doc  <- statementDoc source
-                        pure (Pretty.sep [doc, "AS", Pretty.text (Text.unpack name)]))
-                    sources)
+        binder     <- rtraverse (const (Variable <$> allocName)) sources
+        fromClause <- sequenceA (flatten sourceDoc sources)
 
         pure $ Pretty.sep
             [ "SELECT"
