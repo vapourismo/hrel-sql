@@ -18,13 +18,15 @@ module Language.SQL.Expression
     , not
     , (&&)
     , (||)
+    , true
+    , false
 
     , Label (..)
     , (<.>)
     )
 where
 
-import Prelude (Bool, Double, Fractional (..), Integer, Num (..), (.))
+import Prelude (Bool (..), Double, Fractional (..), Integer, Num (..), (.))
 
 import GHC.OverloadedLabels (IsLabel (..))
 import GHC.TypeLits         (KnownSymbol, Symbol)
@@ -147,6 +149,12 @@ infixr 3 &&
 (||) = Infix Or
 
 infixr 2 ||
+
+true :: Expression SqlBool
+true = BoolLiteral True
+
+false :: Expression SqlBool
+false = BoolLiteral False
 
 ----------------------------------------------------------------------------------------------------
 -- Field access
