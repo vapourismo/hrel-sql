@@ -8,7 +8,6 @@ where
 
 import GHC.TypeLits
 
-import           Data.List        (intersperse)
 import qualified Data.Text        as Text
 import           Data.Vinyl       (Rec (..))
 import qualified Text.PrettyPrint as Pretty
@@ -24,9 +23,10 @@ binOpDoc Minus    = "-"
 binOpDoc Multiply = "*"
 binOpDoc Divide   = "/"
 
-callableDoc :: Callable xs r -> Pretty.Doc
-callableDoc Absolute = "ABS"
-callableDoc Sign     = "SIGN"
+callableDoc :: Callable xs r -> Rec Expression xs -> Pretty.Doc
+callableDoc Absolute (x :& RNil) = "ABS" <> Pretty.parens (expDoc x)
+callableDoc Not      (x :& RNil) = "NOT" <> Pretty.parens (expDoc x)
+callableDoc Sign     (x :& RNil) = "SIGN" <> Pretty.parens (expDoc x)
 
 quoteText :: Text.Text -> Pretty.Doc
 quoteText =
@@ -34,10 +34,6 @@ quoteText =
     where
         insertQuote '\'' = "''"
         insertQuote x    = Text.singleton x
-
-flattenRecord :: Rec Expression a -> [Pretty.Doc]
-flattenRecord RNil          = []
-flattenRecord (exp :& tail) = expDoc exp : flattenRecord tail
 
 expDoc :: Expression a -> Pretty.Doc
 expDoc = \case
@@ -64,6 +60,4 @@ expDoc = \case
         , Pretty.text (symbolVal field)
         ]
 
-    Apply callable params ->
-        callableDoc callable
-        <> Pretty.parens (Pretty.hcat (intersperse ", " (flattenRecord params)))
+    Apply callable params -> callableDoc callable params
