@@ -12,7 +12,7 @@ import qualified Data.Text        as Text
 import           Data.Vinyl       (Rec (..))
 import qualified Text.PrettyPrint as Pretty
 
-import Language.SQL.Expression
+import Language.SQL.Expression (BinaryOp (..), Callable (..), Expression (..), Label (..))
 
 binOpDoc :: BinaryOp a b -> Pretty.Doc
 binOpDoc And      = "AND"

@@ -33,7 +33,7 @@ import Data.Ratio (denominator, numerator)
 import Data.Text  (Text)
 import Data.Vinyl (Rec (..))
 
-import Language.SQL.Columns
+import Language.SQL.Columns (ColumnType)
 
 ----------------------------------------------------------------------------------------------------
 -- Base types
