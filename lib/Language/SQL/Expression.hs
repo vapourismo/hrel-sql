@@ -25,9 +25,10 @@ where
 
 import Prelude (Bool (..), Double, Fractional (..), Integer, Num (..), (.))
 
-import Data.Kind  (Type)
-import Data.Ratio (denominator, numerator)
-import Data.Text  (Text)
+import Data.Kind   (Type)
+import Data.Ratio  (denominator, numerator)
+import Data.String (IsString (..))
+import Data.Text   (Text)
 
 import Language.SQL.Row
 
@@ -64,6 +65,9 @@ data Expression :: Type -> Type where
 
 ----------------------------------------------------------------------------------------------------
 -- Basic operations on 'Expression'
+
+instance IsString (Expression SqlString) where
+    fromString = StringLiteral . fromString
 
 instance Num (Expression SqlInt) where
     (+) = Infix "+"
