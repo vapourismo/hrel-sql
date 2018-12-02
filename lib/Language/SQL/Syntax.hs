@@ -37,8 +37,8 @@ type Builder = State Int
 runBuilder :: Builder a -> a
 runBuilder action = evalState action 0
 
-allocName :: Builder Text.Text
-allocName = Text.pack . ('B' :) . show <$> state (\idx -> (idx, idx + 1))
+allocName :: Builder String
+allocName = ('B' :) . show <$> state (\idx -> (idx, idx + 1))
 
 stringLiteral :: Text.Text -> Pretty.Doc
 stringLiteral =
@@ -46,6 +46,13 @@ stringLiteral =
     where
         insertQuote '\'' = "''"
         insertQuote x    = Text.singleton x
+
+alias :: String -> Pretty.Doc -> Pretty.Doc
+alias name doc = Pretty.sep
+    [ Pretty.parens doc
+    , "AS"
+    , Pretty.text name
+    ]
 
 expDoc :: Expression a -> Pretty.Doc
 expDoc = \case
@@ -85,21 +92,11 @@ prepareSource (statement :: Statement row) = do
     name <- allocName
     doc  <- statementDoc statement
     pure $ Pair
-        (Const (mkDoc name doc))
-        (Captured (selectStatement (Variable name) :: row Expression))
-    where
-        mkDoc name doc = Pretty.sep
-            [ Pretty.parens doc
-            , "AS"
-            , Pretty.text (Text.unpack name)
-            ]
+        (Const (alias name doc))
+        (Captured (selectStatement (Variable (Text.pack name)) :: row Expression))
 
 selectDoc :: Named Expression a -> Pretty.Doc
-selectDoc (Named name@Label exp) = Pretty.sep
-    [ Pretty.parens (expDoc exp)
-    , "AS"
-    , Pretty.text (symbolVal name)
-    ]
+selectDoc (Named name@Label exp) = alias (symbolVal name) (expDoc exp)
 
 statementDoc :: Row row => Statement row -> Builder Pretty.Doc
 statementDoc = \case
