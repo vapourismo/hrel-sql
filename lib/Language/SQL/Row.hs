@@ -39,7 +39,7 @@ data Label :: Symbol -> Type where
 instance (a ~ b, KnownSymbol b) => IsLabel a (Label b) where
     fromLabel = Label
 
-data Named :: (a -> Type) -> a -> Type where
+data Named :: (k -> Type) -> k -> Type where
     Named :: Label name -> f a -> Named f a
 
 instance KnownSymbol name => IsLabel name (f a -> Named f a) where

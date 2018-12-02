@@ -16,20 +16,21 @@ module Language.SQL.Syntax
     )
 where
 
-import GHC.TypeLits
+import GHC.TypeLits (symbolVal)
 
-import Control.Monad.State.Strict
+import Control.Monad.State.Strict (State, evalState, state)
 
-import           Data.Functor.Const
-import           Data.Functor.Product
+import           Data.Functor.Const   (Const (..))
+import           Data.Functor.Product (Product (..))
 import           Data.List            (intersperse)
-import           Data.Proxy
+import           Data.Proxy           (Proxy (..))
 import qualified Data.Text            as Text
 import qualified Text.PrettyPrint     as Pretty
 
-import Language.SQL.Expression
-import Language.SQL.Row
-import Language.SQL.Statement
+import Language.SQL.Expression (Expression (..))
+import Language.SQL.Row        (Label (..), Named (..), Row (..), RowApplicative (..),
+                                RowFoldable (..), RowFunctor (..), RowTraversable (..))
+import Language.SQL.Statement  (Captured (..), Statement (..))
 
 type Builder = State Int
 

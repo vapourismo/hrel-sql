@@ -30,7 +30,7 @@ import Data.Ratio  (denominator, numerator)
 import Data.String (IsString (..))
 import Data.Text   (Text)
 
-import Language.SQL.Row
+import Language.SQL.Row (Label, Record (..), RowFoldable)
 
 ----------------------------------------------------------------------------------------------------
 -- Base types

@@ -8,8 +8,8 @@ module Language.SQL.Statement where
 import Data.Kind (Type)
 import Data.Text (Text)
 
-import Language.SQL.Expression
-import Language.SQL.Row
+import Language.SQL.Expression (Expression, SqlBool)
+import Language.SQL.Row        (Row, RowConstraint, RowKind, RowTraversable)
 
 newtype Captured (row :: RowKind Type) = Captured {unCapture :: row Expression}
 
