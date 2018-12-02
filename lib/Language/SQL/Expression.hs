@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE TypeFamilies          #-}
 
 module Language.SQL.Expression
@@ -31,6 +32,7 @@ import Prelude (Bool (..), Double, Fractional (..), Integer, Num (..), (.))
 import GHC.OverloadedLabels (IsLabel (..))
 import GHC.TypeLits         (KnownSymbol, Symbol)
 
+import Data.Kind  (Type)
 import Data.Ratio (denominator, numerator)
 import Data.Text  (Text)
 import Data.Vinyl (Rec (..))
@@ -51,30 +53,12 @@ data SqlString
 ----------------------------------------------------------------------------------------------------
 -- Binary operators
 
-data BinaryOp a r where
-    And :: BinaryOp SqlBool SqlBool
-
-    Or :: BinaryOp SqlBool SqlBool
-
-    Equals :: BinaryOp a SqlBool
-
-    Plus :: BinaryOp a a
-
-    Minus :: BinaryOp a a
-
-    Multiply :: BinaryOp a a
-
-    Divide :: BinaryOp a a
+newtype BinaryOp a b c = BinaryOp Text
 
 ----------------------------------------------------------------------------------------------------
 -- Callables
 
-data Callable xs r where
-    Absolute :: Callable '[a] a
-
-    Sign :: Callable '[a] a
-
-    Not :: Callable '[SqlBool] SqlBool
+newtype Callable (xs :: [Type]) r = Callable Text
 
 ----------------------------------------------------------------------------------------------------
 -- Expression data type
@@ -90,7 +74,7 @@ data Expression a where
 
     Variable :: Text -> Expression a
 
-    Infix :: BinaryOp a b -> Expression a -> Expression a -> Expression b
+    Infix :: BinaryOp a b c -> Expression a -> Expression b -> Expression c
 
     Access :: ColumnType a n ~ b => Expression a -> Label n -> Expression b
 
@@ -100,53 +84,53 @@ data Expression a where
 -- Basic operations on 'Expression'
 
 instance Num (Expression SqlInt) where
-    (+) = Infix Plus
+    (+) = Infix (BinaryOp "+")
 
-    (-) = Infix Minus
+    (-) = Infix (BinaryOp "-")
 
-    (*) = Infix Plus
+    (*) = Infix (BinaryOp "*")
 
-    abs x = Apply Absolute (x :& RNil)
+    abs x = Apply (Callable "ABS") (x :& RNil)
 
-    signum x = Apply Sign (x :& RNil)
+    signum x = Apply (Callable "SIGN") (x :& RNil)
 
     fromInteger = IntegerLiteral
 
 instance Num (Expression SqlReal) where
-    (+) = Infix Plus
+    (+) = Infix (BinaryOp "+")
 
-    (-) = Infix Minus
+    (-) = Infix (BinaryOp "-")
 
-    (*) = Infix Plus
+    (*) = Infix (BinaryOp "*")
 
-    abs x = Apply Absolute (x :& RNil)
+    abs x = Apply (Callable "ABS") (x :& RNil)
 
-    signum x = Apply Sign (x :& RNil)
+    signum x = Apply (Callable "SIGN") (x :& RNil)
 
     fromInteger = RealLiteral . fromInteger
 
 instance Fractional (Expression SqlReal) where
-    (/) = Infix Divide
+    (/) = Infix (BinaryOp "/")
 
     recip = (1 /)
 
     fromRational ratio = fromInteger (numerator ratio) / fromInteger (denominator ratio)
 
 (==) :: Expression a -> Expression a -> Expression SqlBool
-(==) = Infix Equals
+(==) = Infix (BinaryOp "=")
 
 infix 4 ==
 
 not :: Expression SqlBool -> Expression SqlBool
-not x = Apply Not (x :& RNil)
+not x = Apply (Callable "NOT") (x :& RNil)
 
 (&&) :: Expression SqlBool -> Expression SqlBool -> Expression SqlBool
-(&&) = Infix And
+(&&) = Infix (BinaryOp "AND")
 
 infixr 3 &&
 
 (||) :: Expression SqlBool -> Expression SqlBool -> Expression SqlBool
-(||) = Infix Or
+(||) = Infix (BinaryOp "OR")
 
 infixr 2 ||
 

@@ -27,6 +27,10 @@ import Language.SQL.Expression (BinaryOp (..), Callable (..), Expression (..), L
 import Language.SQL.Selector
 import Language.SQL.Statement
 
+flatten :: (forall x. f x -> a) -> Rec f xs -> [a]
+flatten _ RNil      = []
+flatten f (x :& xs) = f x : flatten f xs
+
 type Builder = State Int
 
 runBuilder :: Builder a -> a
@@ -34,20 +38,6 @@ runBuilder action = evalState action 0
 
 allocName :: Builder Text.Text
 allocName = Text.pack . ('B' :) . show <$> state (\idx -> (idx, idx + 1))
-
-binOpDoc :: BinaryOp a b -> Pretty.Doc
-binOpDoc And      = "AND"
-binOpDoc Or       = "OR"
-binOpDoc Equals   = "="
-binOpDoc Plus     = "+"
-binOpDoc Minus    = "-"
-binOpDoc Multiply = "*"
-binOpDoc Divide   = "/"
-
-callableDoc :: Callable xs r -> Rec Expression xs -> Pretty.Doc
-callableDoc Absolute (x :& RNil) = "ABS" <> Pretty.parens (expDoc x)
-callableDoc Not      (x :& RNil) = "NOT" <> Pretty.parens (expDoc x)
-callableDoc Sign     (x :& RNil) = "SIGN" <> Pretty.parens (expDoc x)
 
 stringLiteral :: Text.Text -> Pretty.Doc
 stringLiteral =
@@ -69,9 +59,9 @@ expDoc = \case
 
     Variable name -> Pretty.text (Text.unpack name)
 
-    Infix op lhs rhs -> Pretty.sep
+    Infix (BinaryOp op) lhs rhs -> Pretty.sep
         [ Pretty.parens (expDoc lhs)
-        , binOpDoc op
+        , Pretty.text (Text.unpack op)
         , Pretty.parens (expDoc rhs)
         ]
 
@@ -81,11 +71,9 @@ expDoc = \case
         , Pretty.text (symbolVal field)
         ]
 
-    Apply callable params -> callableDoc callable params
-
-flatten :: (forall x. f x -> a) -> Rec f xs -> [a]
-flatten _ RNil      = []
-flatten f (x :& xs) = f x : flatten f xs
+    Apply (Callable name) params ->
+        Pretty.text (Text.unpack name)
+        <> Pretty.parens (Pretty.hcat (intersperse "," (flatten expDoc params)))
 
 selectorDoc :: Rec SelectorExpression xs -> Pretty.Doc
 selectorDoc selector =
