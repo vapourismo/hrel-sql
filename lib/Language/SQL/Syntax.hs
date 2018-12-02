@@ -1,10 +1,12 @@
-{-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE GADTs             #-}
-{-# LANGUAGE LambdaCase        #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE PolyKinds         #-}
-{-# LANGUAGE RankNTypes        #-}
-{-# LANGUAGE TypeOperators     #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE GADTs               #-}
+{-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE PolyKinds           #-}
+{-# LANGUAGE RankNTypes          #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE TypeOperators       #-}
 
 module Language.SQL.Syntax
     ( Builder
@@ -18,18 +20,16 @@ import GHC.TypeLits
 
 import Control.Monad.State.Strict
 
-import           Data.List        (intersperse)
-import qualified Data.Text        as Text
-import           Data.Vinyl       (Rec (..), rtraverse)
-import qualified Text.PrettyPrint as Pretty
+import           Data.Functor.Const
+import           Data.Functor.Product
+import           Data.List            (intersperse)
+import           Data.Proxy
+import qualified Data.Text            as Text
+import qualified Text.PrettyPrint     as Pretty
 
-import Language.SQL.Expression (BinaryOp (..), Callable (..), Expression (..), Label (..))
-import Language.SQL.Selector
+import Language.SQL.Expression
+import Language.SQL.Row
 import Language.SQL.Statement
-
-flatten :: (forall x. f x -> a) -> Rec f xs -> [a]
-flatten _ RNil      = []
-flatten f (x :& xs) = f x : flatten f xs
 
 type Builder = State Int
 
@@ -59,7 +59,7 @@ expDoc = \case
 
     Variable name -> Pretty.text (Text.unpack name)
 
-    Infix (BinaryOp op) lhs rhs -> Pretty.sep
+    Infix op lhs rhs -> Pretty.sep
         [ Pretty.parens (expDoc lhs)
         , Pretty.text (Text.unpack op)
         , Pretty.parens (expDoc rhs)
@@ -71,41 +71,61 @@ expDoc = \case
         , Pretty.text (symbolVal field)
         ]
 
-    Apply (Callable name) params ->
+    Apply name params ->
         Pretty.text (Text.unpack name)
-        <> Pretty.parens (Pretty.hcat (intersperse "," (flatten expDoc params)))
+        <> Pretty.parens (Pretty.hcat (intersperse ", " (foldMapRow (pure . expDoc) params)))
 
-selectorDoc :: Rec SelectorExpression xs -> Pretty.Doc
-selectorDoc selector =
-    Pretty.hcat (intersperse ", " (flatten go selector))
-    where
-        go :: SelectorExpression x -> Pretty.Doc
-        go (SelectorExpression label@Label exp) =
-            Pretty.sep
-                [ Pretty.parens (expDoc exp)
-                , "AS"
-                , Pretty.text (symbolVal label)
-                ]
+selectStatement :: Row row => Expression (row Expression) -> row Expression
+selectStatement exp =
+    mapRow (\(Named name _) -> Access exp name) (nameFields (pureRow (Const ())))
 
-sourceDoc :: Statement a -> Builder Pretty.Doc
-sourceDoc source = do
+prepareSource :: Row row => Statement row -> Builder (Product (Const Pretty.Doc) Captured row)
+prepareSource (statement :: Statement row) = do
     name <- allocName
-    doc  <- statementDoc source
-    pure (Pretty.sep [doc, "AS", Pretty.text (Text.unpack name)])
+    doc  <- statementDoc statement
+    pure $ Pair
+        (Const (mkDoc name doc))
+        (Captured (selectStatement (Variable name) :: row Expression))
+    where
+        mkDoc name doc = Pretty.sep
+            [ Pretty.parens doc
+            , "AS"
+            , Pretty.text (Text.unpack name)
+            ]
 
-statementDoc :: Statement a -> Builder Pretty.Doc
+selectDoc :: Named Expression a -> Pretty.Doc
+selectDoc (Named name@Label exp) = Pretty.sep
+    [ Pretty.parens (expDoc exp)
+    , "AS"
+    , Pretty.text (symbolVal name)
+    ]
+
+statementDoc :: Row row => Statement row -> Builder Pretty.Doc
 statementDoc = \case
     TableOnly name -> pure ("TABLE ONLY " <> Pretty.text (Text.unpack name))
 
     Select expand restrict sources -> do
-        binder     <- rtraverse (const (Variable <$> allocName)) sources
-        fromClause <- sequenceA (flatten sourceDoc sources)
+        sources <- traverseConstrainedRow (Proxy @Row) prepareSource sources
+
+        let binders = mapRow (\(Pair _ rhs) -> rhs) sources
+
+        let selectClause =
+                Pretty.hcat
+                $ intersperse ", "
+                $ foldMapRow (pure . selectDoc) (nameFields (expand binders))
+
+        let fromClause =
+                Pretty.hcat
+                $ intersperse ", "
+                $ foldMapRow (\(Pair (Const doc) _) -> pure doc) sources
+
+        let whereClause = expDoc (restrict binders)
 
         pure $ Pretty.sep
             [ "SELECT"
-            , selectorDoc (expand binder)
+            , selectClause
             , "FROM"
-            , Pretty.hcat (intersperse ", " fromClause)
+            , fromClause
             , "WHERE"
-            , expDoc (restrict binder)
+            , whereClause
             ]

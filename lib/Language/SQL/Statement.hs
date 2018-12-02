@@ -1,20 +1,24 @@
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GADTs      #-}
+{-# LANGUAGE PolyKinds  #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeInType #-}
 
-module Language.SQL.Statement
-    ( Statement (..) )
-where
+module Language.SQL.Statement where
 
-import Data.Text  (Text)
-import Data.Vinyl (Rec (..))
+import Data.Kind (Type)
+import Data.Text (Text)
 
 import Language.SQL.Expression
-import Language.SQL.Selector
+import Language.SQL.Row
 
-data Statement a where
-    TableOnly :: Text -> Statement a
+newtype Captured (row :: RowKind Type) = Captured {unCapture :: row Expression}
+
+data Statement :: RowKind Type -> Type where
+    TableOnly :: Text -> Statement row
 
     Select
-        :: (Rec Expression xs -> Selector a)
-        -> (Rec Expression xs -> Expression SqlBool)
-        -> Rec Statement xs
-        -> Statement a
+        :: (RowTraversable source, RowConstraint Row source)
+        => (source Captured -> row Expression)
+        -> (source Captured -> Expression SqlBool)
+        -> source Statement
+        -> Statement row
