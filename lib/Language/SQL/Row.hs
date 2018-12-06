@@ -53,7 +53,7 @@ type RowKind k = (k -> Type) -> Type
 class RowFunctor (row :: RowKind k) where
     mapRow :: (forall a. f a -> g a) -> row f -> row g
 
-class RowApplicative (row :: RowKind k) where
+class RowFunctor row => RowApplicative (row :: RowKind k) where
     pureRow :: (forall a. f a) -> row f
 
 class RowFoldable (row :: RowKind k) where

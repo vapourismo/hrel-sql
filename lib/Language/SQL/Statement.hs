@@ -1,17 +1,28 @@
-{-# LANGUAGE GADTs      #-}
-{-# LANGUAGE PolyKinds  #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TypeInType #-}
+{-# LANGUAGE GADTs            #-}
+{-# LANGUAGE PolyKinds        #-}
+{-# LANGUAGE RankNTypes       #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeInType       #-}
 
 module Language.SQL.Statement where
 
-import Data.Kind (Type)
-import Data.Text (Text)
+import Control.Monad.State.Strict
 
-import Language.SQL.Expression (Expression, SqlBool)
-import Language.SQL.Row        (Row, RowConstraint, RowKind, RowTraversable)
+import Data.Functor.Const
+import Data.Kind          (Type)
+import Data.Proxy
+import Data.Text          (Text, pack)
+
+import Language.SQL.Expression
+import Language.SQL.Row
 
 newtype Captured (row :: RowKind Type) = Captured {unCapture :: row Expression}
+
+instance RowFunctor Captured where
+    mapRow f (Captured x) = Captured (f x)
+
+instance RowApplicative Captured where
+    pureRow = Captured
 
 data Statement :: RowKind Type -> Type where
     TableOnly :: Text -> Statement row
@@ -22,3 +33,24 @@ data Statement :: RowKind Type -> Type where
         -> (source Captured -> Expression SqlBool)
         -> source Statement
         -> Statement row
+
+instance RowFunctor Statement where
+    mapRow _ (TableOnly name)                 = TableOnly name
+    mapRow f (Select expand restrict sources) = Select (f . expand) restrict sources
+
+instance RowApplicative Statement where
+    pureRow x = Select (const x) (const true) Unit
+
+fillSelector :: Row row => Expression a -> row Expression
+fillSelector exp =
+    mapRow (\(Named name _) -> Access exp name) (nameFields (pureRow (Const ())))
+
+instance RowFoldable Statement where
+    foldMapRow _ (TableOnly _)             = mempty
+    foldMapRow f (Select expand _ sources) =
+        f (expand (flip evalState (0 :: Word) (traverseConstrainedRow (Proxy @Row) go sources)))
+        where
+            go _ = state $ \index ->
+                ( Captured (fillSelector (Variable (pack ('V' : show index))))
+                , index + 1
+                )
