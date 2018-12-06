@@ -1,7 +1,9 @@
 {-# LANGUAGE GADTs            #-}
+{-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE PolyKinds        #-}
 {-# LANGUAGE RankNTypes       #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies     #-}
 {-# LANGUAGE TypeInType       #-}
 
 module Language.SQL.Statement where
@@ -23,6 +25,19 @@ instance RowFunctor Captured where
 
 instance RowApplicative Captured where
     pureRow = Captured
+
+instance RowFoldable Captured where
+    foldMapRow f (Captured x) = f x
+
+instance RowTraversable Captured where
+    traverseRow f (Captured x) = Captured <$> f x
+
+    type RowConstraint c Captured = c Expression
+
+    traverseConstrainedRow _ f (Captured x) = Captured <$> f x
+
+instance Row Captured where
+    nameFields (Captured x) = Captured (#unCapture x)
 
 data Statement :: RowKind Type -> Type where
     TableOnly :: Text -> Statement row
