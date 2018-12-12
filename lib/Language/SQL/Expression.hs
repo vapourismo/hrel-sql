@@ -15,6 +15,10 @@ module Language.SQL.Expression
     , Expression (..)
 
     , (==)
+    , (<)
+    , (>)
+    , (<=)
+    , (>=)
     , not
     , (&&)
     , (||)
@@ -106,6 +110,26 @@ instance Fractional (Expression SqlReal) where
 (==) = Infix "="
 
 infix 4 ==
+
+(>) :: Expression a -> Expression a -> Expression SqlBool
+(>) = Infix ">"
+
+infix 4 >
+
+(<) :: Expression a -> Expression a -> Expression SqlBool
+(<) = Infix "<"
+
+infix 4 <
+
+(>=) :: Expression a -> Expression a -> Expression SqlBool
+(>=) = Infix ">="
+
+infix 4 >=
+
+(<=) :: Expression a -> Expression a -> Expression SqlBool
+(<=) = Infix "<="
+
+infix 4 <=
 
 not :: Expression SqlBool -> Expression SqlBool
 not x = Apply "NOT" (x :* Unit)
