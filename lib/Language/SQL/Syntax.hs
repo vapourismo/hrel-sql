@@ -108,22 +108,19 @@ statementDoc = \case
         let binders = mapRow (\(Pair _ rhs) -> rhs) sources
 
         let selectClause =
-                Pretty.hcat
-                $ intersperse ", "
-                $ foldMapRow (pure . selectDoc) (nameFields (expand binders))
+                case foldMapRow (pure . selectDoc) (nameFields (expand binders)) of
+                    [] -> "SELECT NULL"
+                    xs -> "SELECT " <> Pretty.hcat (intersperse ", " xs)
 
         let fromClause =
-                Pretty.hcat
-                $ intersperse ", "
-                $ foldMapRow (\(Pair (Const doc) _) -> pure doc) sources
+                case foldMapRow (\(Pair (Const doc) _) -> pure doc) sources of
+                    [] -> mempty
+                    xs -> "FROM " <> Pretty.hcat (intersperse ", " xs)
 
-        let whereClause = expDoc (restrict binders)
+        let whereClause = "WHERE " <> expDoc (restrict binders)
 
         pure $ Pretty.sep
-            [ "SELECT"
-            , selectClause
-            , "FROM"
+            [ selectClause
             , fromClause
-            , "WHERE"
             , whereClause
             ]

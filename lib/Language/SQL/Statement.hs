@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs            #-}
+{-# LANGUAGE LambdaCase       #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE PolyKinds        #-}
 {-# LANGUAGE RankNTypes       #-}
@@ -8,11 +9,11 @@
 
 module Language.SQL.Statement where
 
-import Control.Monad.State.Strict
+import Control.Monad.State.Strict (evalState, state)
 
-import Data.Functor.Const
+import Data.Functor.Const (Const (..))
 import Data.Kind          (Type)
-import Data.Proxy
+import Data.Proxy         (Proxy (..))
 import Data.String        (IsString (..))
 import Data.Text          (Text, pack)
 
@@ -79,11 +80,18 @@ project
     => (row Expression -> row' Expression)
     -> Statement row
     -> Statement row'
-project selector source =
-    Select
-        (\(Captured exp :* Unit) -> selector exp)
-        (const true)
-        (source :* Unit)
+project selector = \case
+    Select expand restrict source ->
+        Select
+            (\row -> selector (expand row))
+            restrict
+            source
+
+    source ->
+        Select
+            (\(Captured exp :* Unit) -> selector exp)
+            (const true)
+            (source :* Unit)
 
 restrict
     :: Row row
@@ -96,10 +104,23 @@ restrict restrictor source =
         (\(Captured exp :* Unit) -> restrictor exp)
         (source :* Unit)
 
-join
-    :: (Row source, RowConstraint Row source)
+joinSome
+    :: (RowTraversable source, RowConstraint Row source)
     => (source Captured -> row Expression)
     -> (source Captured -> Expression SqlBool)
     -> source Statement
     -> Statement row
-join = Select
+joinSome = Select
+
+join2
+    :: (Row f, Row g)
+    => (f Expression -> g Expression -> h Expression)
+    -> (f Expression -> g Expression -> Expression SqlBool)
+    -> Statement f
+    -> Statement g
+    -> Statement h
+join2 expand restrict lhs rhs =
+    joinSome
+        (\(Captured lhs :* Captured rhs :* Unit) -> expand lhs rhs)
+        (\(Captured lhs :* Captured rhs :* Unit) -> restrict lhs rhs)
+        (lhs :* (rhs :* Unit))
