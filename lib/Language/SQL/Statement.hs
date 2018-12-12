@@ -13,6 +13,7 @@ import Control.Monad.State.Strict
 import Data.Functor.Const
 import Data.Kind          (Type)
 import Data.Proxy
+import Data.String        (IsString (..))
 import Data.Text          (Text, pack)
 
 import Language.SQL.Expression
@@ -63,9 +64,42 @@ fillSelector exp =
 instance RowFoldable Statement where
     foldMapRow _ (TableOnly _)             = mempty
     foldMapRow f (Select expand _ sources) =
-        f (expand (flip evalState (0 :: Word) (traverseConstrainedRow (Proxy @Row) go sources)))
+        f (expand (evalState (traverseConstrainedRow (Proxy @Row) go sources) (0 :: Word)))
         where
             go _ = state $ \index ->
                 ( Captured (fillSelector (Variable (pack ('V' : show index))))
                 , index + 1
                 )
+
+instance IsString (Statement row) where
+    fromString = TableOnly . fromString
+
+project
+    :: Row row
+    => (row Expression -> row' Expression)
+    -> Statement row
+    -> Statement row'
+project selector source =
+    Select
+        (\(Captured exp :* Unit) -> selector exp)
+        (const true)
+        (source :* Unit)
+
+restrict
+    :: Row row
+    => (row Expression -> Expression SqlBool)
+    -> Statement row
+    -> Statement row
+restrict restrictor source =
+    Select
+        (\(Captured exp :* Unit) -> exp)
+        (\(Captured exp :* Unit) -> restrictor exp)
+        (source :* Unit)
+
+join
+    :: (Row source, RowConstraint Row source)
+    => (source Captured -> row Expression)
+    -> (source Captured -> Expression SqlBool)
+    -> source Statement
+    -> Statement row
+join = Select
