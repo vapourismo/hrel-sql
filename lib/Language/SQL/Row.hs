@@ -81,6 +81,8 @@ data Record :: [k] -> RowKind k where
     Unit :: Record '[] f
     (:*) :: f x -> Record xs f -> Record (x ': xs) f
 
+infixr 7 :*
+
 instance RowFunctor (Record xs) where
     mapRow _ Unit      = Unit
     mapRow f (x :* xs) = f x :* mapRow f xs
