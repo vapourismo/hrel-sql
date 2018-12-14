@@ -13,11 +13,10 @@ import Prelude hiding ((&&))
 
 import Control.Monad.State.Strict (evalState, state)
 
-import Data.Functor.Const (Const (..))
-import Data.Kind          (Type)
-import Data.Proxy         (Proxy (..))
-import Data.String        (IsString (..))
-import Data.Text          (Text, pack)
+import Data.Kind   (Type)
+import Data.Proxy  (Proxy (..))
+import Data.String (IsString (..))
+import Data.Text   (Text, pack)
 
 import Language.SQL.Expression
 import Language.SQL.Row
@@ -62,7 +61,7 @@ instance RowApplicative Statement where
 
 expandExpression :: Row row => Expression a -> row Expression
 expandExpression exp =
-    mapRow (\(Named name _) -> Access exp name) (nameFields (pureRow (Const ())))
+    mapRow (\(Named name _) -> Access exp name) (nameFields (pureRow Proxy))
 
 instance RowFoldable Statement where
     foldMapRow _ (TableOnly _)             = mempty
