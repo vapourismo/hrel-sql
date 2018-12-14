@@ -123,4 +123,4 @@ join2 expand restrict lhs rhs =
     joinSome
         (\(Captured lhs :* Captured rhs :* Unit) -> expand lhs rhs)
         (\(Captured lhs :* Captured rhs :* Unit) -> restrict lhs rhs)
-        (lhs :* (rhs :* Unit))
+        (lhs :* rhs :* Unit)

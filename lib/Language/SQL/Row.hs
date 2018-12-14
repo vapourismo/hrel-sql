@@ -4,6 +4,7 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE PatternSynonyms       #-}
 {-# LANGUAGE PolyKinds             #-}
 {-# LANGUAGE RankNTypes            #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
@@ -21,14 +22,16 @@ module Language.SQL.Row
     , RowFoldable (..)
     , RowTraversable (..)
     , Row (..)
-    , Record (..)
+    , Record (.., Single)
+    , unSingle
     )
 where
 
 import GHC.OverloadedLabels (IsLabel (..))
 import GHC.TypeLits         (KnownSymbol, Symbol)
 
-import Data.Kind (Constraint, Type)
+import Data.Kind  (Constraint, Type)
+import Data.Proxy (Proxy (..))
 
 ----------------------------------------------------------------------------------------------------
 -- Helper types
@@ -75,11 +78,39 @@ class (RowApplicative row, RowTraversable row) => Row (row :: RowKind k) where
     nameFields :: row f -> row (Named f)
 
 ----------------------------------------------------------------------------------------------------
+-- Empty row
+
+instance RowFunctor Proxy where
+    mapRow _ _ = Proxy
+
+instance RowApplicative Proxy where
+    pureRow _ = Proxy
+
+instance RowFoldable Proxy where
+    foldMapRow _ _ = mempty
+
+instance RowTraversable Proxy where
+    traverseRow _ _ = pure Proxy
+
+    type RowConstraint c Proxy = ()
+
+    traverseConstrainedRow _ _ _ = pure Proxy
+
+instance Row Proxy where
+    nameFields _ = Proxy
+
+----------------------------------------------------------------------------------------------------
 -- Plain row
 
 data Record :: [k] -> RowKind k where
     Unit :: Record '[] f
     (:*) :: f x -> Record xs f -> Record (x ': xs) f
+
+pattern Single :: f x -> Record '[x] f
+pattern Single x = x :* Unit
+
+unSingle :: Record '[x] f -> f x
+unSingle (x :* Unit) = x
 
 infixr 7 :*
 
