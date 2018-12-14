@@ -9,6 +9,8 @@
 
 module Language.SQL.Statement where
 
+import Prelude hiding ((&&))
+
 import Control.Monad.State.Strict (evalState, state)
 
 import Data.Functor.Const (Const (..))
@@ -75,34 +77,41 @@ instance RowFoldable Statement where
 instance IsString (Statement row) where
     fromString = TableOnly . fromString
 
-project
+select
     :: Row row
     => (row Expression -> row' Expression)
     -> Statement row
     -> Statement row'
-project selector = \case
+select selector = \case
     Select expand restrict source ->
         Select
-            (\row -> selector (expand row))
+            (selector . expand)
             restrict
             source
 
     source ->
         Select
-            (\(Captured exp :* Unit) -> selector exp)
+            (selector . unCapture . unSingle)
             (const true)
-            (source :* Unit)
+            (Single source)
 
 restrict
     :: Row row
     => (row Expression -> Expression SqlBool)
     -> Statement row
     -> Statement row
-restrict restrictor source =
-    Select
-        (\(Captured exp :* Unit) -> exp)
-        (\(Captured exp :* Unit) -> restrictor exp)
-        (source :* Unit)
+restrict restrictor = \case
+    Select expand restrict source ->
+        Select
+            expand
+            (\row -> restrictor (expand row) && restrict row)
+            source
+
+    source ->
+        Select
+            (unCapture . unSingle)
+            (restrictor . unCapture . unSingle)
+            (Single source)
 
 joinSome
     :: (RowTraversable source, RowConstraint Row source)
