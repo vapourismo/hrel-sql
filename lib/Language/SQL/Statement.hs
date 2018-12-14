@@ -13,10 +13,11 @@ import Prelude hiding ((&&))
 
 import Control.Monad.State.Strict (evalState, state)
 
-import Data.Kind   (Type)
-import Data.Proxy  (Proxy (..))
-import Data.String (IsString (..))
-import Data.Text   (Text, pack)
+import Data.Functor.Product (Product (..))
+import Data.Kind            (Type)
+import Data.Proxy           (Proxy (..))
+import Data.String          (IsString (..))
+import Data.Text            (Text, pack)
 
 import Language.SQL.Expression
 import Language.SQL.Row
@@ -103,7 +104,7 @@ restrict restrictor = \case
     Select expand restrict source ->
         Select
             expand
-            (\row -> restrictor (expand row) && restrict row)
+            (\row -> restrict row && restrictor (expand row))
             source
 
     source ->
@@ -127,8 +128,33 @@ join2
     -> Statement f
     -> Statement g
     -> Statement h
-join2 expand restrict lhs rhs =
-    joinSome
-        (\(Captured lhs :* Captured rhs :* Unit) -> expand lhs rhs)
-        (\(Captured lhs :* Captured rhs :* Unit) -> restrict lhs rhs)
-        (lhs :* rhs :* Unit)
+join2 expander restrictor lhs rhs = case (lhs, rhs) of
+    (Select lhsExpand lhsRestrict lhsSource, Select rhsExpand rhsRestrict rhsSource) ->
+        Select
+            (\(Pair lhs rhs) -> expander (lhsExpand lhs) (rhsExpand rhs))
+            (\(Pair lhs rhs) ->
+                lhsRestrict lhs
+                && rhsRestrict rhs
+                && restrictor (lhsExpand lhs) (rhsExpand rhs))
+            (Pair lhsSource rhsSource)
+
+    (Select lhsExpand lhsRestrict lhsSource, TableOnly{}) ->
+        Select
+            (\(Pair lhs (Single rhs)) -> expander (lhsExpand lhs) (unCapture rhs))
+            (\(Pair lhs (Single rhs)) ->
+                lhsRestrict lhs && restrictor (lhsExpand lhs) (unCapture rhs))
+            (Pair lhsSource (Single rhs))
+
+    (TableOnly{}, Select rhsExpand rhsRestrict rhsSource) ->
+        Select
+            (\(Pair (Single lhs) rhs) -> expander (unCapture lhs) (rhsExpand rhs))
+            (\(Pair (Single lhs) rhs) ->
+                restrictor (unCapture lhs) (rhsExpand rhs) && rhsRestrict rhs)
+            (Pair (Single lhs) rhsSource)
+
+    _ ->
+        joinSome
+            (\(Captured lhs :* Captured rhs :* Unit) -> expander lhs rhs)
+            (\(Captured lhs :* Captured rhs :* Unit) -> restrictor lhs rhs)
+            (lhs :* rhs :* Unit)
+

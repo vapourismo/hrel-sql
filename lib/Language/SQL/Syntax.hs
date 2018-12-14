@@ -42,7 +42,7 @@ allocName = ('B' :) . show <$> state (\idx -> (idx, idx + 1))
 
 stringLiteral :: Text.Text -> Pretty.Doc
 stringLiteral =
-    Pretty.text . Text.unpack . Text.concatMap insertQuote
+    Pretty.quotes . Pretty.text . Text.unpack . Text.concatMap insertQuote
     where
         insertQuote '\'' = "''"
         insertQuote x    = Text.singleton x

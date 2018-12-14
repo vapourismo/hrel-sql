@@ -30,8 +30,9 @@ where
 import GHC.OverloadedLabels (IsLabel (..))
 import GHC.TypeLits         (KnownSymbol, Symbol)
 
-import Data.Kind  (Constraint, Type)
-import Data.Proxy (Proxy (..))
+import Data.Functor.Product (Product (..))
+import Data.Kind            (Constraint, Type)
+import Data.Proxy           (Proxy (..))
 
 ----------------------------------------------------------------------------------------------------
 -- Helper types
@@ -98,6 +99,32 @@ instance RowTraversable Proxy where
 
 instance Row Proxy where
     nameFields _ = Proxy
+
+----------------------------------------------------------------------------------------------------
+-- Product row
+
+instance (RowFunctor lhs, RowFunctor rhs) => RowFunctor (Product lhs rhs) where
+    mapRow f (Pair lhs rhs) = Pair (mapRow f lhs) (mapRow f rhs)
+
+instance (RowApplicative lhs, RowApplicative rhs) => RowApplicative (Product lhs rhs) where
+    pureRow f = Pair (pureRow f) (pureRow f)
+
+instance (RowFoldable lhs, RowFoldable rhs) => RowFoldable (Product lhs rhs) where
+    foldMapRow f (Pair lhs rhs) = foldMapRow f lhs <> foldMapRow f rhs
+
+instance (RowTraversable lhs, RowTraversable rhs) => RowTraversable (Product lhs rhs) where
+    traverseRow f (Pair lhs rhs) = Pair
+        <$> traverseRow f lhs
+        <*> traverseRow f rhs
+
+    type RowConstraint c (Product lhs rhs) = (RowConstraint c lhs, RowConstraint c rhs)
+
+    traverseConstrainedRow proxy f (Pair lhs rhs) = Pair
+        <$> traverseConstrainedRow proxy f lhs
+        <*> traverseConstrainedRow proxy f rhs
+
+instance (Row lhs, Row rhs) => Row (Product lhs rhs) where
+    nameFields (Pair lhs rhs) = Pair (nameFields lhs) (nameFields rhs)
 
 ----------------------------------------------------------------------------------------------------
 -- Plain row
