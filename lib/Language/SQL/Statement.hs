@@ -60,8 +60,8 @@ instance RowFunctor Statement where
 instance RowApplicative Statement where
     pureRow x = Select (const x) (const true) Unit
 
-fillSelector :: Row row => Expression a -> row Expression
-fillSelector exp =
+expandExpression :: Row row => Expression a -> row Expression
+expandExpression exp =
     mapRow (\(Named name _) -> Access exp name) (nameFields (pureRow (Const ())))
 
 instance RowFoldable Statement where
@@ -70,7 +70,7 @@ instance RowFoldable Statement where
         f (expand (evalState (traverseConstrainedRow (Proxy @Row) go sources) (0 :: Word)))
         where
             go _ = state $ \index ->
-                ( Captured (fillSelector (Variable (pack ('V' : show index))))
+                ( Captured (expandExpression (Variable (pack ('V' : show index))))
                 , index + 1
                 )
 
