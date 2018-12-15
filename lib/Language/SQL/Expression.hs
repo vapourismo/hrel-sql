@@ -34,7 +34,7 @@ import Data.Ratio  (denominator, numerator)
 import Data.String (IsString (..))
 import Data.Text   (Text)
 
-import Language.SQL.Row (Label, Record (..), RowFoldable)
+import Language.SQL.Row (Label, RowFoldable (..), Single (..))
 
 ----------------------------------------------------------------------------------------------------
 -- Base types
@@ -80,9 +80,9 @@ instance Num (Expression SqlInt) where
 
     (*) = Infix "*"
 
-    abs x = Apply "ABS" (x :* Unit)
+    abs x = Apply "ABS" (Single x)
 
-    signum x = Apply "SIGN" (x :* Unit)
+    signum x = Apply "SIGN" (Single x)
 
     fromInteger = IntegerLiteral
 
@@ -93,9 +93,9 @@ instance Num (Expression SqlReal) where
 
     (*) = Infix "*"
 
-    abs x = Apply "ABS" (x :* Unit)
+    abs x = Apply "ABS" (Single x)
 
-    signum x = Apply "SIGN" (x :* Unit)
+    signum x = Apply "SIGN" (Single x)
 
     fromInteger = RealLiteral . fromInteger
 
@@ -132,7 +132,7 @@ infix 4 >=
 infix 4 <=
 
 not :: Expression SqlBool -> Expression SqlBool
-not x = Apply "NOT" (x :* Unit)
+not x = Apply "NOT" (Single x)
 
 (&&) :: Expression SqlBool -> Expression SqlBool -> Expression SqlBool
 (&&) = Infix "AND"

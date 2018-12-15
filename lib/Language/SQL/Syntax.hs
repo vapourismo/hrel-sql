@@ -29,8 +29,8 @@ import qualified Text.PrettyPrint     as Pretty
 
 import Language.SQL.Expression (Expression (..))
 import Language.SQL.Row        (Label (..), Named (..), Row (..), RowApplicative (..),
-                                RowFoldable (..), RowFunctor (..), RowTraversable (..))
-import Language.SQL.Statement  (Captured (..), Statement (..))
+                                RowFoldable (..), RowFunctor (..), RowTraversable (..), Single (..))
+import Language.SQL.Statement  (Statement (..))
 
 type Builder = State Int
 
@@ -87,13 +87,13 @@ selectStatement :: Row row => Expression (row Expression) -> row Expression
 selectStatement exp =
     mapRow (\(Named name _) -> Access exp name) (nameFields (pureRow (Const ())))
 
-prepareSource :: Row row => Statement row -> Builder (Product (Const Pretty.Doc) Captured row)
+prepareSource :: Row row => Statement row -> Builder (Product (Const Pretty.Doc) (Single Expression) row)
 prepareSource (statement :: Statement row) = do
     name <- allocName
     doc  <- statementDoc statement
     pure $ Pair
         (Const (alias name doc))
-        (Captured (selectStatement (Variable (Text.pack name)) :: row Expression))
+        (Single (selectStatement (Variable (Text.pack name)) :: row Expression))
 
 selectDoc :: Named Expression a -> Pretty.Doc
 selectDoc (Named name@Label exp) = alias (symbolVal name) (expDoc exp)
