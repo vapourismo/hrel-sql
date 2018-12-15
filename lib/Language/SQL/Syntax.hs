@@ -28,8 +28,9 @@ import qualified Data.Text            as Text
 import qualified Text.PrettyPrint     as Pretty
 
 import Language.SQL.Expression (Expression (..))
-import Language.SQL.Row        (Label (..), Named (..), Row (..), RowFoldable (..), RowFunctor (..),
-                                Single (..), foldMapRowWithName, traverseConstrainedRow)
+import Language.SQL.Row        (Label (..), Row (..), RowFoldable (..), RowFunctor (..),
+                                Single (..), foldMapRowWithName, pureRowWithName,
+                                traverseConstrainedRow)
 import Language.SQL.Statement  (Statement (..))
 
 type Builder = State Int
@@ -84,7 +85,7 @@ expDoc = \case
         <> Pretty.parens (Pretty.hcat (intersperse ", " (foldMapRow (pure . expDoc) params)))
 
 selectStatement :: Row row => Expression (row Expression) -> row Expression
-selectStatement exp = mapRow (\(Named name) -> Access exp name) nameFields
+selectStatement exp = pureRowWithName (Access exp)
 
 prepareSource :: Row row => Statement row -> Builder (Product (Const Pretty.Doc) (Single Expression) row)
 prepareSource (statement :: Statement row) = do

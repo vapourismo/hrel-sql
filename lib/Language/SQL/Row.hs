@@ -18,9 +18,9 @@
 module Language.SQL.Row
     ( Label (..)
     , Named (..)
+    , Dict (..)
 
     , RowKind
-    , Dict (..)
 
     , RowFunctor (..)
     , RowApplicative (..)
@@ -31,6 +31,7 @@ module Language.SQL.Row
 
     , traverseConstrainedRow
     , mapRowWithName
+    , pureRowWithName
     , traverseRowWithName
     , foldMapRowWithName
 
@@ -104,7 +105,7 @@ class (RowFunctor row, RowFoldable row) => RowTraversable (row :: RowKind k) whe
     sequenceRow = traverseRow getCompose
 
 class (RowApplicative row, RowTraversable row) => Row (row :: RowKind k) where
-    nameFields :: row Named
+    namedRow :: row Named
 
 traverseConstrainedRow
     :: (Applicative g, RowDict row, RowTraversable row, All c row)
@@ -116,7 +117,10 @@ traverseConstrainedRow (_ :: proxy c) f (row :: row f) =
     traverseRow (\(Pair Dict x) -> f x) (applyRow Pair (dictRow :: row (Dict c)) row)
 
 mapRowWithName :: Row row => (forall name a. Label name -> f a -> g a) -> row f -> row g
-mapRowWithName f = applyRow (\(Named label) row -> f label row) nameFields
+mapRowWithName f = applyRow (\(Named label) row -> f label row) namedRow
+
+pureRowWithName :: Row row => (forall name a. Label name -> f a) -> row f
+pureRowWithName f = mapRow (\(Named label) -> f label) namedRow
 
 traverseRowWithName
     :: (Row row, Applicative g)
@@ -124,7 +128,7 @@ traverseRowWithName
     -> row f
     -> g (row h)
 traverseRowWithName f row =
-    sequenceRow (applyRow (\(Named label) x -> Compose (f label x)) nameFields row)
+    sequenceRow (applyRow (\(Named label) x -> Compose (f label x)) namedRow row)
 
 foldMapRowWithName :: (Row row, Monoid m) => (forall name a. Label name -> f a -> m) -> row f -> m
 foldMapRowWithName f row = getConst (traverseRowWithName (\label x -> Const (f label x)) row)
@@ -152,7 +156,7 @@ instance RowTraversable Proxy where
     traverseRow _ _ = pure Proxy
 
 instance Row Proxy where
-    nameFields = Proxy
+    namedRow = Proxy
 
 ----------------------------------------------------------------------------------------------------
 -- Singular row
@@ -178,7 +182,7 @@ instance RowTraversable (Single a) where
     traverseRow f (Single x) = Single <$> f x
 
 instance Row (Single a) where
-    nameFields = Single #unSingle
+    namedRow = Single #unSingle
 
 ----------------------------------------------------------------------------------------------------
 -- Product row
@@ -208,4 +212,4 @@ instance (RowTraversable lhs, RowTraversable rhs) => RowTraversable (Product lhs
     traverseRow f (Pair lhs rhs) = Pair <$> traverseRow f lhs <*> traverseRow f rhs
 
 instance (Row lhs, Row rhs) => Row (Product lhs rhs) where
-    nameFields = Pair nameFields nameFields
+    namedRow = Pair namedRow namedRow

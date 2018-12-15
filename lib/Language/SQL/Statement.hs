@@ -29,9 +29,6 @@ data Statement :: RowKind Type -> Type where
         -> source Statement
         -> Statement row
 
-expandExpression :: Row row => Expression a -> row Expression
-expandExpression exp = mapRow (\(Named name) -> Access exp name) nameFields
-
 instance IsString (Statement row) where
     fromString = TableOnly . fromString
 
