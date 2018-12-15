@@ -28,8 +28,8 @@ import qualified Data.Text            as Text
 import qualified Text.PrettyPrint     as Pretty
 
 import Language.SQL.Expression (Expression (..))
-import Language.SQL.Row        (Label (..), Named (..), Row (..), RowApplicative (..),
-                                RowFoldable (..), RowFunctor (..), RowTraversable (..), Single (..))
+import Language.SQL.Row        (Label (..), Named (..), Row (..), RowFoldable (..), RowFunctor (..),
+                                Single (..), foldMapRowWithName, traverseConstrainedRow)
 import Language.SQL.Statement  (Statement (..))
 
 type Builder = State Int
@@ -84,8 +84,7 @@ expDoc = \case
         <> Pretty.parens (Pretty.hcat (intersperse ", " (foldMapRow (pure . expDoc) params)))
 
 selectStatement :: Row row => Expression (row Expression) -> row Expression
-selectStatement exp =
-    mapRow (\(Named name _) -> Access exp name) (nameFields (pureRow (Const ())))
+selectStatement exp = mapRow (\(Named name) -> Access exp name) nameFields
 
 prepareSource :: Row row => Statement row -> Builder (Product (Const Pretty.Doc) (Single Expression) row)
 prepareSource (statement :: Statement row) = do
@@ -95,8 +94,8 @@ prepareSource (statement :: Statement row) = do
         (Const (alias name doc))
         (Single (selectStatement (Variable (Text.pack name)) :: row Expression))
 
-selectDoc :: Named Expression a -> Pretty.Doc
-selectDoc (Named name@Label exp) = alias (symbolVal name) (expDoc exp)
+selectDoc :: Label name -> Expression a -> Pretty.Doc
+selectDoc name@Label exp = alias (symbolVal name) (expDoc exp)
 
 statementDoc :: Row row => Statement row -> Builder Pretty.Doc
 statementDoc = \case
@@ -108,7 +107,7 @@ statementDoc = \case
         let binders = mapRow (\(Pair _ rhs) -> rhs) sources
 
         let selectClause =
-                case foldMapRow (pure . selectDoc) (nameFields (expand binders)) of
+                case foldMapRowWithName (\n e -> [selectDoc n e]) (expand binders) of
                     [] -> "SELECT NULL"
                     xs -> "SELECT " <> Pretty.hcat (intersperse ", " xs)
 

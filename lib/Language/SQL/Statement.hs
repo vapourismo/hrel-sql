@@ -13,7 +13,6 @@ import Prelude hiding ((&&))
 
 import Data.Functor.Product (Product (..))
 import Data.Kind            (Type)
-import Data.Proxy           (Proxy (..))
 import Data.String          (IsString (..))
 import Data.Text            (Text)
 
@@ -24,22 +23,14 @@ data Statement :: RowKind Type -> Type where
     TableOnly :: Text -> Statement row
 
     Select
-        :: (RowTraversable source, RowConstraint Row source)
+        :: (RowTraversable source, RowDict source, All Row source)
         => (source (Single Expression) -> row Expression)
         -> (source (Single Expression) -> Expression SqlBool)
         -> source Statement
         -> Statement row
 
-instance RowFunctor Statement where
-    mapRow _ (TableOnly name)                 = TableOnly name
-    mapRow f (Select expand restrict sources) = Select (f . expand) restrict sources
-
-instance RowApplicative Statement where
-    pureRow x = Select (const x) (const true) Proxy
-
 expandExpression :: Row row => Expression a -> row Expression
-expandExpression exp =
-    mapRow (\(Named name _) -> Access exp name) (nameFields (pureRow Proxy))
+expandExpression exp = mapRow (\(Named name) -> Access exp name) nameFields
 
 instance IsString (Statement row) where
     fromString = TableOnly . fromString
