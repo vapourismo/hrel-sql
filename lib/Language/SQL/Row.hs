@@ -21,19 +21,10 @@ module Language.SQL.Row
     , Dict (..)
 
     , RowKind
-
-    , RowFunctor (..)
-    , RowApplicative (..)
-    , RowDict (..)
-    , RowFoldable (..)
-    , RowTraversable (..)
     , Row (..)
-
-    , traverseConstrainedRow
-    , mapRowWithName
-    , pureRowWithName
-    , traverseRowWithName
-    , foldMapRowWithName
+    , buniqWithName
+    , bfoldMapWithName
+    , btraverseC
 
     , Proxy (..)
     , Single (..)
@@ -45,12 +36,12 @@ where
 import GHC.OverloadedLabels (IsLabel (..))
 import GHC.TypeLits         (KnownSymbol, Symbol)
 
-import Data.Functor.Compose  (Compose (..))
-import Data.Functor.Const    (Const (..))
-import Data.Functor.Identity (Identity (..))
-import Data.Functor.Product  (Product (..))
-import Data.Kind             (Constraint, Type)
-import Data.Proxy            (Proxy (..))
+import Data.Barbie             (ConstraintsB (..), FunctorB (..), ProductB (..), ProductBC (..),
+                                TraversableB (..), bfoldMap)
+import Data.Barbie.Constraints (Dict (..))
+import Data.Functor.Product    (Product (..))
+import Data.Kind               (Type)
+import Data.Proxy              (Proxy (..))
 
 ----------------------------------------------------------------------------------------------------
 -- Helper types
@@ -67,93 +58,31 @@ data Named :: k -> Type where
 instance KnownSymbol name => IsLabel name (Named a) where
     fromLabel = Named (Label @name)
 
-data Dict :: (k -> Constraint) -> k -> Type where
-    Dict :: c a => Dict c a
-
 ----------------------------------------------------------------------------------------------------
 -- Row classes
 
 type RowKind k = (k -> Type) -> Type
 
-class RowFunctor (row :: RowKind k) where
-    mapRow :: (forall a. f a -> g a) -> row f -> row g
-
-    default mapRow :: RowTraversable row => (forall a. f a -> g a) -> row f -> row g
-    mapRow f row = runIdentity (traverseRow (Identity . f) row)
-
-class RowFunctor row => RowApplicative (row :: RowKind k) where
-    pureRow :: (forall a. f a) -> row f
-
-    applyRow :: (forall a. f a -> g a -> h a) -> row f -> row g -> row h
-
-class RowApplicative row => RowDict (row :: RowKind k) where
-    type All (c :: k -> Constraint) row :: Constraint
-
-    dictRow :: All c row => row (Dict c)
-
-class RowFoldable (row :: RowKind k) where
-    foldMapRow :: Monoid m => (forall a. f a -> m) -> row f -> m
-
-    default foldMapRow :: (RowTraversable row, Monoid m) => (forall a. f a -> m) -> row f -> m
-    foldMapRow f row = getConst (traverseRow (Const . f) row)
-
-class (RowFunctor row, RowFoldable row) => RowTraversable (row :: RowKind k) where
-    traverseRow :: Applicative g => (forall a. f a -> g (h a)) -> row f -> g (row h)
-    traverseRow f = sequenceRow . mapRow (Compose . f)
-
-    sequenceRow :: Applicative f => row (Compose f g) -> f (row g)
-    sequenceRow = traverseRow getCompose
-
-class (RowApplicative row, RowTraversable row) => Row (row :: RowKind k) where
+class (TraversableB row, ProductB row) => Row (row :: RowKind k) where
     namedRow :: row Named
 
-traverseConstrainedRow
-    :: (Applicative g, RowDict row, RowTraversable row, All c row)
+buniqWithName :: Row row => (forall name a. Label name -> f a) -> row f
+buniqWithName f = bmap (\(Named label) -> f label) namedRow
+
+bfoldMapWithName :: (Row row, Monoid m) => (forall name a. Label name -> f a -> m) -> row f -> m
+bfoldMapWithName f row = bfoldMap (\(Pair (Named label) x) -> f label x) (bprod namedRow row)
+
+btraverseC
+    :: (TraversableB row, ConstraintsB row, AllB c row, Applicative g)
     => proxy c
     -> (forall a. c a => f a -> g (h a))
     -> row f
     -> g (row h)
-traverseConstrainedRow (_ :: proxy c) f (row :: row f) =
-    traverseRow (\(Pair Dict x) -> f x) (applyRow Pair (dictRow :: row (Dict c)) row)
-
-mapRowWithName :: Row row => (forall name a. Label name -> f a -> g a) -> row f -> row g
-mapRowWithName f = applyRow (\(Named label) row -> f label row) namedRow
-
-pureRowWithName :: Row row => (forall name a. Label name -> f a) -> row f
-pureRowWithName f = mapRow (\(Named label) -> f label) namedRow
-
-traverseRowWithName
-    :: (Row row, Applicative g)
-    => (forall name a. Label name -> f a -> g (h a))
-    -> row f
-    -> g (row h)
-traverseRowWithName f row =
-    sequenceRow (applyRow (\(Named label) x -> Compose (f label x)) namedRow row)
-
-foldMapRowWithName :: (Row row, Monoid m) => (forall name a. Label name -> f a -> m) -> row f -> m
-foldMapRowWithName f row = getConst (traverseRowWithName (\label x -> Const (f label x)) row)
+btraverseC (_ :: proxy c) f row =
+    btraverse (\(Pair (Dict :: Dict c a) (x :: f a)) -> f x) (baddDicts row)
 
 ----------------------------------------------------------------------------------------------------
 -- Empty row
-
-instance RowFunctor Proxy where
-    mapRow _ _ = Proxy
-
-instance RowApplicative Proxy where
-    pureRow _ = Proxy
-
-    applyRow _ _ _ = Proxy
-
-instance RowFoldable Proxy where
-    foldMapRow _ _ = mempty
-
-instance RowDict Proxy where
-    type All c Proxy = ()
-
-    dictRow = Proxy
-
-instance RowTraversable Proxy where
-    traverseRow _ _ = pure Proxy
 
 instance Row Proxy where
     namedRow = Proxy
@@ -163,23 +92,24 @@ instance Row Proxy where
 
 newtype Single (a :: k) (f :: k -> Type) = Single {unSingle :: f a}
 
-instance RowFunctor (Single a) where
-    mapRow f (Single x) = Single (f x)
+instance FunctorB (Single a) where
+    bmap f (Single x) = Single (f x)
 
-instance RowApplicative (Single a) where
-    pureRow = Single
+instance TraversableB (Single a) where
+    btraverse f (Single x) = Single <$> f x
 
-    applyRow f (Single x) (Single y) = Single (f x y)
+instance ConstraintsB (Single a) where
+    type AllB c (Single a) = c a
 
-instance RowFoldable (Single a) where
-    foldMapRow f (Single x) = f x
+    baddDicts (Single x) = Single (Pair Dict x)
 
-instance RowDict (Single a) where
-    type All c (Single a) = c a
-    dictRow = Single Dict
+instance ProductB (Single a) where
+    buniq = Single
 
-instance RowTraversable (Single a) where
-    traverseRow f (Single x) = Single <$> f x
+    bprod (Single x) (Single y) = Single (Pair x y)
+
+instance ProductBC (Single a) where
+    bdicts = Single Dict
 
 instance Row (Single a) where
     namedRow = Single #unSingle
@@ -191,25 +121,6 @@ pattern (:*) :: f a -> f b -> Product (Single a) (Single b) f
 pattern (:*) lhs rhs = Pair (Single lhs) (Single rhs)
 
 infixr 7 :*
-
-instance (RowFunctor lhs, RowFunctor rhs) => RowFunctor (Product lhs rhs) where
-    mapRow f (Pair lhs rhs) = Pair (mapRow f lhs) (mapRow f rhs)
-
-instance (RowApplicative lhs, RowApplicative rhs) => RowApplicative (Product lhs rhs) where
-    pureRow f = Pair (pureRow f) (pureRow f)
-
-    applyRow f (Pair ll lr) (Pair rl rr) = Pair (applyRow f ll rl) (applyRow f lr rr)
-
-instance (RowFoldable lhs, RowFoldable rhs) => RowFoldable (Product lhs rhs) where
-    foldMapRow f (Pair lhs rhs) = foldMapRow f lhs <> foldMapRow f rhs
-
-instance (RowDict lhs, RowDict rhs) => RowDict (Product lhs rhs) where
-    type All c (Product lhs rhs) = (All c lhs, All c rhs)
-
-    dictRow = Pair dictRow dictRow
-
-instance (RowTraversable lhs, RowTraversable rhs) => RowTraversable (Product lhs rhs) where
-    traverseRow f (Pair lhs rhs) = Pair <$> traverseRow f lhs <*> traverseRow f rhs
 
 instance (Row lhs, Row rhs) => Row (Product lhs rhs) where
     namedRow = Pair namedRow namedRow

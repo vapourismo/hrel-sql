@@ -18,8 +18,9 @@ where
 
 import GHC.TypeLits (symbolVal)
 
-import Control.Monad.State.Strict (State, evalState, state)
+import Control.Monad.Trans.State.Strict (State, evalState, state)
 
+import           Data.Barbie          (bfoldMap, bmap)
 import           Data.Functor.Const   (Const (..))
 import           Data.Functor.Product (Product (..))
 import           Data.List            (intersperse)
@@ -28,9 +29,8 @@ import qualified Data.Text            as Text
 import qualified Text.PrettyPrint     as Pretty
 
 import Language.SQL.Expression (Expression (..))
-import Language.SQL.Row        (Label (..), Row (..), RowFoldable (..), RowFunctor (..),
-                                Single (..), foldMapRowWithName, pureRowWithName,
-                                traverseConstrainedRow)
+import Language.SQL.Row        (Label (..), Row (..), Single (..), bfoldMapWithName, btraverseC,
+                                buniqWithName)
 import Language.SQL.Statement  (Statement (..))
 
 type Builder = State Int
@@ -82,10 +82,10 @@ expDoc = \case
 
     Apply name params ->
         Pretty.text (Text.unpack name)
-        <> Pretty.parens (Pretty.hcat (intersperse ", " (foldMapRow (pure . expDoc) params)))
+        <> Pretty.parens (Pretty.hcat (intersperse ", " (bfoldMap (pure . expDoc) params)))
 
 selectStatement :: Row row => Expression (row Expression) -> row Expression
-selectStatement exp = pureRowWithName (Access exp)
+selectStatement exp = buniqWithName (Access exp)
 
 prepareSource :: Row row => Statement row -> Builder (Product (Const Pretty.Doc) (Single Expression) row)
 prepareSource (statement :: Statement row) = do
@@ -103,17 +103,17 @@ statementDoc = \case
     TableOnly name -> pure ("TABLE ONLY " <> Pretty.text (Text.unpack name))
 
     Select expand restrict sources -> do
-        sources <- traverseConstrainedRow (Proxy @Row) prepareSource sources
+        sources <- btraverseC (Proxy @Row) prepareSource sources
 
-        let binders = mapRow (\(Pair _ rhs) -> rhs) sources
+        let binders = bmap (\(Pair _ rhs) -> rhs) sources
 
         let selectClause =
-                case foldMapRowWithName (\n e -> [selectDoc n e]) (expand binders) of
+                case bfoldMapWithName (\n e -> [selectDoc n e]) (expand binders) of
                     [] -> "SELECT NULL"
                     xs -> "SELECT " <> Pretty.hcat (intersperse ", " xs)
 
         let fromClause =
-                case foldMapRow (\(Pair (Const doc) _) -> pure doc) sources of
+                case bfoldMap (\(Pair (Const doc) _) -> pure doc) sources of
                     [] -> mempty
                     xs -> "FROM " <> Pretty.hcat (intersperse ", " xs)
 

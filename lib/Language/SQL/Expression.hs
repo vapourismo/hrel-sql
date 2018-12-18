@@ -29,12 +29,13 @@ where
 
 import Prelude (Bool (..), Double, Fractional (..), Integer, Num (..), (.))
 
+import Data.Barbie
 import Data.Kind   (Type)
 import Data.Ratio  (denominator, numerator)
 import Data.String (IsString (..))
 import Data.Text   (Text)
 
-import Language.SQL.Row (Label, RowFoldable (..), Single (..))
+import Language.SQL.Row (Label, Single (..))
 
 ----------------------------------------------------------------------------------------------------
 -- Base types
@@ -48,7 +49,7 @@ data SqlReal
 data SqlString
 
 ----------------------------------------------------------------------------------------------------
--- Expression data type
+-- Expression type
 
 data Expression :: Type -> Type where
     IntegerLiteral :: Integer -> Expression SqlInt
@@ -65,7 +66,7 @@ data Expression :: Type -> Type where
 
     Access :: Expression a -> Label n -> Expression b
 
-    Apply :: RowFoldable row => Text -> row Expression -> Expression r
+    Apply :: TraversableB row => Text -> row Expression -> Expression r
 
 ----------------------------------------------------------------------------------------------------
 -- Basic operations on 'Expression'
@@ -149,3 +150,6 @@ true = BoolLiteral True
 
 false :: Expression SqlBool
 false = BoolLiteral False
+
+----------------------------------------------------------------------------------------------------
+-- Renderer

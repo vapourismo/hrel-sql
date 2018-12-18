@@ -11,6 +11,7 @@ module Language.SQL.Statement where
 
 import Prelude hiding ((&&))
 
+import Data.Barbie
 import Data.Functor.Product (Product (..))
 import Data.Kind            (Type)
 import Data.String          (IsString (..))
@@ -19,11 +20,14 @@ import Data.Text            (Text)
 import Language.SQL.Expression
 import Language.SQL.Row
 
+----------------------------------------------------------------------------------------------------
+-- Statement type
+
 data Statement :: RowKind Type -> Type where
     TableOnly :: Text -> Statement row
 
     Select
-        :: (RowTraversable source, RowDict source, All Row source)
+        :: (TraversableB source, ConstraintsB source, AllB Row source)
         => (source (Single Expression) -> row Expression)
         -> (source (Single Expression) -> Expression SqlBool)
         -> source Statement
@@ -31,6 +35,9 @@ data Statement :: RowKind Type -> Type where
 
 instance IsString (Statement row) where
     fromString = TableOnly . fromString
+
+----------------------------------------------------------------------------------------------------
+-- Combinators
 
 select
     :: Row row
@@ -68,14 +75,14 @@ restrict restrictor = \case
             (restrictor . unSingle . unSingle)
             (Single source)
 
-join2
+join
     :: (Row f, Row g)
     => (f Expression -> g Expression -> h Expression)
     -> (f Expression -> g Expression -> Expression SqlBool)
     -> Statement f
     -> Statement g
     -> Statement h
-join2 expander restrictor lhs rhs = case (lhs, rhs) of
+join expander restrictor lhs rhs = case (lhs, rhs) of
     (Select lhsExpand lhsRestrict lhsSource, Select rhsExpand rhsRestrict rhsSource) ->
         Select
             (\(Pair lhs rhs) -> expander (lhsExpand lhs) (rhsExpand rhs))
@@ -104,3 +111,6 @@ join2 expander restrictor lhs rhs = case (lhs, rhs) of
             (\(Single lhs :* Single rhs) -> expander lhs rhs)
             (\(Single lhs :* Single rhs) -> restrictor lhs rhs)
             (lhs :* rhs)
+
+----------------------------------------------------------------------------------------------------
+-- Renderer
