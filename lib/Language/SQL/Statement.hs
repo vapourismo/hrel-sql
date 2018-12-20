@@ -3,7 +3,6 @@
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE PolyKinds        #-}
 {-# LANGUAGE RankNTypes       #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies     #-}
 {-# LANGUAGE TypeInType       #-}
 
