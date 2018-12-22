@@ -10,7 +10,7 @@ module Language.SQL.Statement where
 
 import Prelude hiding ((&&))
 
-import Data.Barbie
+import Data.Barbie          (AllB, ConstraintsB, TraversableB)
 import Data.Functor.Product (Product (..))
 import Data.Kind            (Type)
 import Data.String          (IsString (..))

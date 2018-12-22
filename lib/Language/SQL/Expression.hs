@@ -29,7 +29,7 @@ where
 
 import Prelude (Bool (..), Double, Fractional (..), Integer, Num (..), (.))
 
-import Data.Barbie
+import Data.Barbie (TraversableB)
 import Data.Kind   (Type)
 import Data.Ratio  (denominator, numerator)
 import Data.String (IsString (..))
