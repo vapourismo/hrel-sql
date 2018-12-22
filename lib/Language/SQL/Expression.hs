@@ -150,6 +150,3 @@ true = BoolLiteral True
 
 false :: Expression SqlBool
 false = BoolLiteral False
-
-----------------------------------------------------------------------------------------------------
--- Renderer
