@@ -1,6 +1,7 @@
 {-# LANGUAGE GADTs            #-}
 {-# LANGUAGE LambdaCase       #-}
 {-# LANGUAGE OverloadedLabels #-}
+{-# LANGUAGE PatternSynonyms  #-}
 {-# LANGUAGE PolyKinds        #-}
 {-# LANGUAGE RankNTypes       #-}
 {-# LANGUAGE TypeFamilies     #-}
@@ -22,8 +23,8 @@ import Data.Kind            (Type)
 import Data.String          (IsString (..))
 import Data.Text            (Text)
 
-import Language.SQL.Expression
-import Language.SQL.Row
+import Language.SQL.Expression (Expression, SqlBool, true, (&&))
+import Language.SQL.Row        (pattern (:*), Row, RowKind, Single (..))
 
 ----------------------------------------------------------------------------------------------------
 -- Statement type

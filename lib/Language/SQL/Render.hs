@@ -6,7 +6,7 @@ module Language.SQL.Render where
 import           Data.List   (find)
 import           Data.Maybe  (fromJust)
 import qualified Data.Set    as Set
-import           Data.String
+import           Data.String (IsString)
 import qualified Data.Text   as Text
 
 newtype Name = Name Text.Text
