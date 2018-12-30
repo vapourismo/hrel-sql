@@ -117,3 +117,4 @@ join expander restrictor lhs rhs = case (lhs, rhs) of
             (\(Single lhs :* Single rhs) -> expander lhs rhs)
             (\(Single lhs :* Single rhs) -> restrictor lhs rhs)
             (lhs :* rhs)
+

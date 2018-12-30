@@ -12,4 +12,3 @@ library
                     Language.SQL.Expression
                     Language.SQL.Statement
                     Language.SQL.Render
-                    Language.SQL.Syntax

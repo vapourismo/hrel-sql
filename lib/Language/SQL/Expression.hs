@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
@@ -24,18 +25,25 @@ module Language.SQL.Expression
     , (||)
     , true
     , false
+
+    , renderExpression
     )
 where
 
-import Prelude (Bool (..), Double, Fractional (..), Integer, Num (..), (.))
+import Prelude (Bool (..), Double, Fractional (..), Integer, Num (..), pure, ($), (.))
 
-import Data.Barbie (TraversableB)
+import GHC.TypeLits
+
+import Data.Barbie (TraversableB, bfoldMap)
 import Data.Kind   (Type)
+import Data.List   (intersperse)
+import Data.Monoid (mconcat, (<>))
 import Data.Ratio  (denominator, numerator)
 import Data.String (IsString (..))
 import Data.Text   (Text)
 
-import Language.SQL.Row (Label, Single (..))
+import qualified Language.SQL.Render as Render
+import           Language.SQL.Row    (Label (..), Single (..))
 
 ----------------------------------------------------------------------------------------------------
 -- Base types
@@ -60,7 +68,7 @@ data Expression :: Type -> Type where
 
     BoolLiteral :: Bool -> Expression SqlBool
 
-    Variable :: Text -> Expression a
+    Variable :: Render.Name -> Expression a
 
     Infix :: Text -> Expression a -> Expression b -> Expression c
 
@@ -150,3 +158,37 @@ true = BoolLiteral True
 
 false :: Expression SqlBool
 false = BoolLiteral False
+
+----------------------------------------------------------------------------------------------------
+-- Renderer
+
+renderExpression :: Expression a -> Render.Renderer
+renderExpression = \case
+    IntegerLiteral int -> Render.showable int
+
+    RealLiteral real -> Render.showable real
+
+    StringLiteral string -> Render.string string
+
+    BoolLiteral True -> "true"
+    BoolLiteral _    -> "false"
+
+    Variable name -> Render.name name
+
+    Infix op lhs rhs -> Render.parens $ mconcat
+        [ renderExpression lhs
+        , " "
+        , Render.fromText op
+        , " "
+        , renderExpression rhs
+        ]
+
+    Access exp label@Label -> mconcat
+        [ Render.parens (renderExpression exp)
+        , "."
+        , fromString (symbolVal label)
+        ]
+
+    Apply name params ->
+        Render.fromText name
+        <> Render.parens (mconcat (intersperse "," (bfoldMap (pure . renderExpression) params)))
