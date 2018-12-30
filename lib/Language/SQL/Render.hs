@@ -10,8 +10,7 @@ import qualified Data.Set    as Set
 import           Data.String (IsString (..))
 import qualified Data.Text   as Text
 
-newtype Name = Name Text.Text
-    deriving (Show, Eq, Ord, IsString, Semigroup)
+import Language.SQL.Types (Name (..))
 
 newtype Renderer = Renderer {unRenderer :: Set.Set Name -> Text.Text}
     deriving (Semigroup, Monoid)

@@ -24,7 +24,8 @@ import Data.String          (IsString (..))
 import Data.Text            (Text)
 
 import Language.SQL.Expression (Expression, SqlBool, true, (&&))
-import Language.SQL.Row        (pattern (:*), Row, RowKind, Single (..))
+import Language.SQL.Row        (pattern (:*), Row, RowKind)
+import Language.SQL.Types      (Single (..))
 
 ----------------------------------------------------------------------------------------------------
 -- Statement type

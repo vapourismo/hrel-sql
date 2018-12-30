@@ -43,7 +43,7 @@ import Data.String (IsString (..))
 import Data.Text   (Text)
 
 import qualified Language.SQL.Render as Render
-import           Language.SQL.Row    (Label (..), Single (..))
+import           Language.SQL.Types  (Label (..), Name, Single (..))
 
 ----------------------------------------------------------------------------------------------------
 -- Base types
@@ -68,7 +68,7 @@ data Expression :: Type -> Type where
 
     BoolLiteral :: Bool -> Expression SqlBool
 
-    Variable :: Render.Name -> Expression a
+    Variable :: Name -> Expression a
 
     Infix :: Text -> Expression a -> Expression b -> Expression c
 
