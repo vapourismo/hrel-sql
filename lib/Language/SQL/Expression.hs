@@ -5,15 +5,11 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeFamilies          #-}
 
 module Language.SQL.Expression
-    ( SqlBool
-    , SqlInt
-    , SqlString
-    , SqlReal
-
-    , Expression (..)
+    ( Expression (..)
 
     , (==)
     , (<)
@@ -30,8 +26,9 @@ module Language.SQL.Expression
     )
 where
 
-import Prelude (Bool (..), Double, Fractional (..), Integer, Num (..), pure, ($), (.))
+import Prelude (Bool (..), Double, Fractional (..), Integer, Num (..), id, pure, ($), (.))
 
+import GHC.OverloadedLabels (IsLabel (..))
 import GHC.TypeLits
 
 import Data.Barbie (TraversableB, bfoldMap)
@@ -46,27 +43,16 @@ import qualified Language.SQL.Render as Render
 import           Language.SQL.Types  (Label (..), Name, Single (..))
 
 ----------------------------------------------------------------------------------------------------
--- Base types
-
-data SqlBool
-
-data SqlInt
-
-data SqlReal
-
-data SqlString
-
-----------------------------------------------------------------------------------------------------
 -- Expression type
 
 data Expression :: Type -> Type where
-    IntegerLiteral :: Integer -> Expression SqlInt
+    IntegerLiteral :: Num a => Integer -> Expression a
 
-    RealLiteral :: Double -> Expression SqlReal
+    RealLiteral :: Fractional a => Double -> Expression a
 
-    StringLiteral :: Text -> Expression SqlString
+    StringLiteral :: IsString a => Text -> Expression a
 
-    BoolLiteral :: Bool -> Expression SqlBool
+    BoolLiteral :: Bool -> Expression Bool
 
     Variable :: Name -> Expression a
 
@@ -79,10 +65,13 @@ data Expression :: Type -> Type where
 ----------------------------------------------------------------------------------------------------
 -- Basic operations on 'Expression'
 
-instance IsString (Expression SqlString) where
+instance KnownSymbol name => IsLabel name (Expression a -> Expression b) where
+    fromLabel exp = Access exp (Label @name)
+
+instance IsString a => IsString (Expression a) where
     fromString = StringLiteral . fromString
 
-instance Num (Expression SqlInt) where
+instance Num a => Num (Expression a) where
     (+) = Infix "+"
 
     (-) = Infix "-"
@@ -95,68 +84,55 @@ instance Num (Expression SqlInt) where
 
     fromInteger = IntegerLiteral
 
-instance Num (Expression SqlReal) where
-    (+) = Infix "+"
-
-    (-) = Infix "-"
-
-    (*) = Infix "*"
-
-    abs x = Apply "ABS" (Single x)
-
-    signum x = Apply "SIGN" (Single x)
-
-    fromInteger = RealLiteral . fromInteger
-
-instance Fractional (Expression SqlReal) where
+instance Fractional a => Fractional (Expression a) where
     (/) = Infix "/"
 
     recip = (1 /)
 
     fromRational ratio = fromInteger (numerator ratio) / fromInteger (denominator ratio)
 
-(==) :: Expression a -> Expression a -> Expression SqlBool
+(==) :: Expression a -> Expression a -> Expression Bool
 (==) = Infix "="
 
 infix 4 ==
 
-(>) :: Expression a -> Expression a -> Expression SqlBool
+(>) :: Expression a -> Expression a -> Expression Bool
 (>) = Infix ">"
 
 infix 4 >
 
-(<) :: Expression a -> Expression a -> Expression SqlBool
+(<) :: Expression a -> Expression a -> Expression Bool
 (<) = Infix "<"
 
 infix 4 <
 
-(>=) :: Expression a -> Expression a -> Expression SqlBool
+(>=) :: Expression a -> Expression a -> Expression Bool
 (>=) = Infix ">="
 
 infix 4 >=
 
-(<=) :: Expression a -> Expression a -> Expression SqlBool
+(<=) :: Expression a -> Expression a -> Expression Bool
 (<=) = Infix "<="
 
 infix 4 <=
 
-not :: Expression SqlBool -> Expression SqlBool
+not :: Expression Bool -> Expression Bool
 not x = Apply "NOT" (Single x)
 
-(&&) :: Expression SqlBool -> Expression SqlBool -> Expression SqlBool
+(&&) :: Expression Bool -> Expression Bool -> Expression Bool
 (&&) = Infix "AND"
 
 infixr 3 &&
 
-(||) :: Expression SqlBool -> Expression SqlBool -> Expression SqlBool
+(||) :: Expression Bool -> Expression Bool -> Expression Bool
 (||) = Infix "OR"
 
 infixr 2 ||
 
-true :: Expression SqlBool
+true :: Expression Bool
 true = BoolLiteral True
 
-false :: Expression SqlBool
+false :: Expression Bool
 false = BoolLiteral False
 
 ----------------------------------------------------------------------------------------------------
