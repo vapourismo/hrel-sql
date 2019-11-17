@@ -3,53 +3,67 @@
 
 module Language.SQL.Render where
 
-import           Data.List   (find)
-import           Data.Maybe  (fromJust)
+import Control.Monad.Trans.State.Strict
+
 import qualified Data.Set    as Set
 import           Data.String (IsString (..))
 import qualified Data.Text   as Text
 
 import Language.SQL.Types (Name (..))
 
-newtype Renderer = Renderer {unRenderer :: Set.Set Name -> Text.Text}
-    deriving (Semigroup, Monoid)
+newtype Rendered = Rendered
+    { fromRendered :: Text.Text }
+    deriving (Eq, Ord, IsString, Semigroup, Monoid)
 
-instance IsString Renderer where
-    fromString = fromText . Text.pack
+newtype Renderer a = Renderer
+    { unRenderer :: State (Set.Set Name) a }
+    deriving (Functor, Applicative, Monad)
 
-fromText :: Text.Text -> Renderer
-fromText text = Renderer (const text)
+type Render = Renderer Rendered
 
-withName :: Name -> (Name -> Renderer) -> Renderer
-withName name handle =
-    Renderer (makeName >>= invoke)
-    where
-        generateName (Name prefix) usedNames =
-            fromJust $ find (not . flip Set.member usedNames) $
-                map (\index -> Name (prefix <> Text.pack (show index))) [1 :: Integer ..]
+runRender :: Render -> Text.Text
+runRender (Renderer action) = fromRendered (evalState action Set.empty)
 
-        makeName usedNames
-            | Set.member name usedNames = generateName name usedNames
-            | otherwise                 = name
+instance IsString a => IsString (Renderer a) where
+    fromString = Renderer . pure . fromString
 
-        invoke name usedNames = unRenderer (handle name) (Set.insert name usedNames)
+instance Semigroup a => Semigroup (Renderer a) where
+    lhs <> rhs = (<>) <$> lhs <*> rhs
 
-showable :: Show a => a -> Renderer
+instance Monoid a => Monoid (Renderer a) where
+    mempty = pure mempty
+
+allocName :: Name -> Renderer Name
+allocName prefix = Renderer $ do
+    currentNames <- get
+    let name = head
+            [ name
+            | index <- [1 :: Integer ..]
+            , let name = prefix <> Name (fromString (show index))
+            , not (Set.member name currentNames)
+            ]
+
+    modify (Set.insert name)
+    pure name
+
+fromText :: Text.Text -> Render
+fromText = pure . Rendered
+
+showable :: Show a => a -> Render
 showable value = fromString (show value)
 
-quote :: Char -> Text.Text -> Renderer
-quote delim body =
-    fromText (Text.replace (Text.singleton delim) (Text.pack [delim, delim]) body)
+quote :: Char -> Render -> Render
+quote delim = fmap $ \body ->
+    Rendered (Text.replace (Text.singleton delim) (Text.pack [delim, delim]) (fromRendered body))
 
-parens :: Renderer -> Renderer
+parens :: Render -> Render
 parens inner = "(" <> inner <> ")"
 
-string :: Text.Text -> Renderer
+string :: Render -> Render
 string = quote '\''
 
-name :: Name -> Renderer
-name (Name name) = quote '"' name
+name :: Name -> Render
+name (Name name) = quote '"' (fromText name)
 
-alias :: Name -> Renderer -> Renderer
-alias (Name name) body = parens body <> quote '"' name
-
+alias :: Name -> Render -> Render
+alias aliasName body = parens body <> " AS " <> name aliasName

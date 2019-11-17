@@ -10,21 +10,23 @@
 
 module Language.SQL.Types
     ( Label (..)
+    , labelName
     , Named (..)
+    , fromNamed
     , Name (..)
     , Single(..)
     )
 where
 
 import GHC.OverloadedLabels (IsLabel (..))
-import GHC.TypeLits         (KnownSymbol, Symbol)
+import GHC.TypeLits         (KnownSymbol, Symbol, symbolVal)
 
 import Data.Barbie             (ConstraintsB (..), FunctorB (..), ProductB (..), ProductBC (..),
                                 TraversableB (..))
 import Data.Barbie.Constraints (Dict (..))
 import Data.Functor.Product    (Product (..))
 import Data.Kind               (Type)
-import Data.String             (IsString)
+import Data.String             (IsString (fromString))
 import Data.Text               (Text)
 
 ----------------------------------------------------------------------------------------------------
@@ -36,6 +38,9 @@ data Label :: Symbol -> Type where
 instance (a ~ b, KnownSymbol b) => IsLabel a (Label b) where
     fromLabel = Label
 
+labelName :: Label name -> Name
+labelName label@Label = fromString (symbolVal label)
+
 ----------------------------------------------------------------------------------------------------
 -- Named
 
@@ -45,10 +50,14 @@ data Named :: k -> Type where
 instance KnownSymbol name => IsLabel name (Named a) where
     fromLabel = Named (Label @name)
 
+fromNamed :: Named a -> Name
+fromNamed (Named name@Label) = fromString (symbolVal name)
+
 ----------------------------------------------------------------------------------------------------
 -- Name
 
-newtype Name = Name Text
+newtype Name = Name
+    { fromName :: Text }
     deriving (Show, Eq, Ord, IsString, Semigroup)
 
 ----------------------------------------------------------------------------------------------------

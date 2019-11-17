@@ -162,13 +162,13 @@ false = BoolLiteral False
 ----------------------------------------------------------------------------------------------------
 -- Renderer
 
-renderExpression :: Expression a -> Render.Renderer
+renderExpression :: Expression a -> Render.Render
 renderExpression = \case
     IntegerLiteral int -> Render.showable int
 
     RealLiteral real -> Render.showable real
 
-    StringLiteral string -> Render.string string
+    StringLiteral string -> Render.string (Render.fromText string)
 
     BoolLiteral True -> "true"
     BoolLiteral _    -> "false"
@@ -184,7 +184,7 @@ renderExpression = \case
         ]
 
     Access exp label@Label -> mconcat
-        [ Render.parens (renderExpression exp)
+        [ accessParens exp (renderExpression exp)
         , "."
         , fromString (symbolVal label)
         ]
@@ -192,3 +192,8 @@ renderExpression = \case
     Apply name params ->
         Render.fromText name
         <> Render.parens (mconcat (intersperse "," (bfoldMap (pure . renderExpression) params)))
+
+    where
+        accessParens = \case
+            Variable{} -> id
+            _          -> Render.parens
